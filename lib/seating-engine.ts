@@ -145,7 +145,8 @@ export function generateSingleSeats(
     }
   }
 
-  return result.filter((s) => s !== null) as Student[]
+  // null을 포함한 모든 자리 반환 (빈 자리도 표시하기 위해)
+  return result
 }
 
 export function generatePairSeats(
@@ -157,10 +158,12 @@ export function generatePairSeats(
   rows?: number, // 총 행 수
   randomizeNumbers: boolean = true, // true면 랜덤 배치, false면 번호 순서대로
 ): Student[][] {
-  // teamsPerLine이 있으면 rows * teamsPerLine으로 총 팀 수 계산, 없으면 학생 수 기준으로 계산
+  // 학생 수에 맞춰 정확히 필요한 팀 수 계산
+  const minPairsNeeded = Math.ceil(students.length / 2)
+  // teamsPerLine과 rows가 있으면 그 값 사용하되, 최소한 모든 학생이 배치될 수 있도록 보장
   const totalPairs = teamsPerLine && rows 
-    ? teamsPerLine * rows 
-    : teamsPerLine || Math.ceil(students.length / 2)
+    ? Math.max(teamsPerLine * rows, minPairsNeeded)
+    : minPairsNeeded
   const pairs: Student[][] = new Array(totalPairs).fill(null).map(() => [])
   
   // 고정된 자리 처리
@@ -201,9 +204,31 @@ export function generatePairSeats(
 
   // 남은 학생들을 배치 (랜덤 또는 순서대로)
   const unfixed = students.filter((s) => !usedStudentIds.has(s.id))
-  const shuffled = randomizeNumbers
-    ? shuffleArray(unfixed)
-    : unfixed.sort((a, b) => (a.originalNumber || a.id) - (b.originalNumber || b.id))
+  
+  // 번호순서대로 배치인 경우 왼쪽에서 오른쪽으로 순서대로 배치
+  if (!randomizeNumbers) {
+    // 번호순서대로 배치: 왼쪽에서 오른쪽으로 순서대로 채우기
+    const sortedUnfixed = unfixed.sort((a, b) => (a.originalNumber || a.id) - (b.originalNumber || b.id))
+    let studentIdx = 0
+    
+    // 모든 팀의 빈 자리를 왼쪽부터 오른쪽으로 순서대로 채우기
+    for (let pairIdx = 0; pairIdx < pairs.length && studentIdx < sortedUnfixed.length; pairIdx++) {
+      const currentPair = pairs[pairIdx]
+      if (currentPair.length < 2) {
+        while (currentPair.length < 2 && studentIdx < sortedUnfixed.length) {
+          currentPair.push(sortedUnfixed[studentIdx])
+          usedStudentIds.add(sortedUnfixed[studentIdx].id)
+          studentIdx++
+        }
+      }
+    }
+    
+    // 빈 팀도 포함하여 반환
+    return pairs
+  }
+  
+  // 랜덤 배치인 경우 기존 로직 사용
+  const shuffled = shuffleArray(unfixed)
 
   // 다른 성별끼리 짝짓기 (남-녀 또는 여-남 상관없음)
   const males = shuffled.filter((s) => s.gender === "male")
@@ -294,7 +319,22 @@ export function generatePairSeats(
     }
   }
 
-  return pairs.filter((p) => p.length > 0)
+  // 모든 학생이 배치되었는지 확인하고, 배치되지 않은 학생이 있으면 남은 자리에 배치
+  const remainingStudents = students.filter(s => !usedStudentIds.has(s.id))
+  if (remainingStudents.length > 0) {
+    // 남은 학생들을 순서대로 남은 자리에 배치
+    let remainingIdx = 0
+    for (let pairIdx = 0; pairIdx < pairs.length && remainingIdx < remainingStudents.length; pairIdx++) {
+      while (pairs[pairIdx].length < 2 && remainingIdx < remainingStudents.length) {
+        pairs[pairIdx].push(remainingStudents[remainingIdx])
+        usedStudentIds.add(remainingStudents[remainingIdx].id)
+        remainingIdx++
+      }
+    }
+  }
+
+  // 빈 팀도 포함하여 반환 (모든 자리를 표시하기 위해)
+  return pairs
 }
 
 export function parseCSV(csvContent: string): Array<{ number: number; gender: "male" | "female" }> {

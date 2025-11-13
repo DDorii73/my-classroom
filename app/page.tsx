@@ -26,7 +26,7 @@ export default function Home() {
   const handleStepZeroSubmit = (data: any) => {
     setFormData({ ...formData, ...data })
     
-    // 1명씩 앉기인 경우 성별 패턴 설정 없이 바로 StepThree로 이동
+    // 1명씩 앉기인 경우
     if (data.seatingType === "single") {
       // 기본 성별 패턴 설정 (odd-even, 하지만 실제로는 사용 안 함)
       setFormData({ 
@@ -35,7 +35,14 @@ export default function Home() {
         genderPattern: { type: "odd-even" },
         randomizeNumbers: data.arrangementType === "ordered" ? false : true,
       })
-      setCurrentStep(3)
+      
+      // 랜덤배치이고 지정좌석을 선택한 경우 StepOne으로 이동
+      if (data.arrangementType === "random" && data.useFixedSeats) {
+        setCurrentStep(1)
+      } else {
+        // 번호대로 배치이거나 지정좌석을 선택하지 않은 경우 바로 StepThree로 이동
+        setCurrentStep(3)
+      }
     } else if (data.arrangementType === "ordered") {
       // 2명씩 짝앉기에서 번호대로 배치를 선택한 경우 바로 StepThree로 이동
       setFormData({ 
@@ -49,7 +56,7 @@ export default function Home() {
       // 2명씩 짝앉기에서 랜덤 배치인 경우 기존 플로우 유지
       // 지정좌석이 체크되어 있으면 StepOne으로, 없으면 StepTwo로
       if (data.useFixedSeats) {
-        setCurrentStep(1)
+    setCurrentStep(1)
       } else {
         setCurrentStep(2)
       }
@@ -58,7 +65,13 @@ export default function Home() {
 
   const handleStepOneSubmit = (data: any) => {
     setFormData({ ...formData, ...data })
+    // 1명씩 앉기인 경우 StepTwo(성별 패턴 설정)를 건너뛰고 바로 StepThree로 이동
+    if (formData.seatingType === "single") {
+      setCurrentStep(3)
+    } else {
+      // 2명씩 짝앉기인 경우 StepTwo로 이동
     setCurrentStep(2)
+    }
   }
 
   const handleStepTwoSubmit = (data: any) => {
@@ -85,11 +98,11 @@ export default function Home() {
           <StepThree 
             formData={formData as FormData} 
             onBack={() => {
-              // 1명씩 앉기이거나 번호대로 배치인 경우 StepZero로, 그 외에는 StepTwo로
+              // 1명씩 앉기이거나 번호대로 배치인 경우 StepZero로, 그 외에는 지정좌석 사용 여부에 따라 StepOne 또는 StepTwo로
               if (formData.seatingType === "single" || formData.arrangementType === "ordered") {
                 setCurrentStep(0)
               } else {
-                setCurrentStep(2)
+                setCurrentStep(formData.useFixedSeats ? 1 : 2)
               }
             }} 
             onReset={handleReset} 
@@ -115,8 +128,11 @@ function StepZero({ onNext }: { onNext: (data: any) => void }) {
         lines: Number.parseInt(teamsPerLine),
         studentCount: Number.parseInt(studentCount),
         seatingType,
-        ...(seatingType === "pair" && { pairOrder }),
-        useFixedSeats: arrangementType === "random" ? useFixedSeats : false,
+        // 랜덤 배치일 때는 pairOrder를 "random"으로 강제 설정하여 성별 구분 없이 배치
+        ...(seatingType === "pair" && { 
+          pairOrder: arrangementType === "random" ? "random" : pairOrder 
+        }),
+        useFixedSeats: arrangementType === "random" ? useFixedSeats : false, // 1명씩 앉기와 2명씩 짝앉기 모두 랜덤 배치일 때 지정좌석 사용 가능
         arrangementType, // "ordered" 또는 "random"
         randomizeNumbers: arrangementType === "random",
       })
@@ -147,25 +163,23 @@ function StepZero({ onNext }: { onNext: (data: any) => void }) {
           <div className="space-y-2">
             <button
               onClick={() => setSeatingType("single")}
-              className={`w-full p-4 rounded-lg border-2 transition-all duration-200 text-left hover:scale-[1.02] active:scale-[0.98] ${
+              className={`w-full p-4 rounded-lg border-2 transition-all duration-200 text-center hover:scale-[1.02] active:scale-[0.98] ${
                 seatingType === "single"
                   ? "border-green-500 bg-green-50 shadow-md"
                   : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
               }`}
             >
               <div className="font-semibold text-gray-800">1명씩 앉기</div>
-              <div className="text-sm text-gray-600">칠판 기준으로 배치할 줄 수를 입력</div>
             </button>
             <button
               onClick={() => setSeatingType("pair")}
-              className={`w-full p-4 rounded-lg border-2 transition-all duration-200 text-left hover:scale-[1.02] active:scale-[0.98] ${
+              className={`w-full p-4 rounded-lg border-2 transition-all duration-200 text-center hover:scale-[1.02] active:scale-[0.98] ${
                 seatingType === "pair"
                   ? "border-green-500 bg-green-50 shadow-md"
                   : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
               }`}
             >
-              <div className="font-semibold text-gray-800">2명씩 짝 앉기</div>
-              <div className="text-sm text-gray-600">칠판 기준으로 배치할 팀(짝)의 수를 입력</div>
+              <div className="font-semibold text-gray-800">2명씩 짝으로 앉기</div>
             </button>
           </div>
         </div>
@@ -175,7 +189,7 @@ function StepZero({ onNext }: { onNext: (data: any) => void }) {
             {seatingType === "pair"
               ? "칠판 기준 1행에 배치할 팀 개수"
               : seatingType === "single"
-                ? "칠판 기준 배치 줄 수"
+                ? "칠판 기준 1행에 배치할 학생 수"
                 : "설정 필요"}
           </label>
           <Input
@@ -186,7 +200,7 @@ function StepZero({ onNext }: { onNext: (data: any) => void }) {
               seatingType === "pair"
                 ? "예: 3 (칠판 기준 1행에 3팀)"
                 : seatingType === "single"
-                  ? "예: 6 (칠판 기준 6줄)"
+                  ? "예: 6 (칠판 기준 1행에 6명)"
                   : "배치 방식을 먼저 선택하세요"
             }
             value={teamsPerLine}
@@ -198,7 +212,7 @@ function StepZero({ onNext }: { onNext: (data: any) => void }) {
             {seatingType === "pair"
               ? "칠판을 기준으로 1행에 몇 개의 팀을 배치할지 입력하세요"
               : seatingType === "single"
-                ? "1명씩 몇 줄에 걸쳐 배치할지 입력하세요"
+                ? "칠판을 기준으로 1행에 몇 명의 학생을 배치할지 입력하세요"
                 : ""}
           </p>
         </div>
@@ -326,20 +340,29 @@ function StepOne({
   const [fixedSeats, setFixedSeats] = useState<Map<number, number | number[]>>(new Map())
   const [inputNumbers, setInputNumbers] = useState<Map<string, string>>(new Map()) // 각 자리별 입력 필드: "seatIndex-position"
   const [errorMessages, setErrorMessages] = useState<Map<string, string>>(new Map()) // 각 자리별 에러 메시지: "seatIndex-position"
+  const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map()) // 각 입력 필드의 ref
 
   const studentCount = formData.studentCount || 0
   const seatingType = formData.seatingType || "single"
-  const rows = formData.lines || 1
+  
+  // 1명씩 앉기: formData.lines는 1행에 배치할 학생 수
+  // 2명씩 짝앉기: formData.lines는 1행에 배치할 팀 개수
+  const studentsPerLine = seatingType === "pair"
+    ? formData.lines || 1 // 2명씩 짝앉기: 1행에 배치할 팀 개수
+    : formData.lines || 1 // 1명씩 앉기: 1행에 배치할 학생 수를 그대로 사용
+  
   const teamsPerLine = formData.lines || 1
-
+  
+  // 1명씩 앉기: 필요한 행 수 계산
+  // 2명씩 짝앉기: 필요한 총 팀 수를 1행에 배치할 팀 개수로 나눈 행 수 계산
+  const rows = seatingType === "single" 
+    ? Math.ceil(studentCount / studentsPerLine) // 1명씩 앉기: 필요한 행 수 계산
+    : Math.ceil(Math.ceil(studentCount / 2) / teamsPerLine) // 2명씩 짝앉기: 필요한 행 수 계산
+  
   // pair 타입일 때는 rows * teamsPerLine으로 총 팀 수 계산
   const totalPairs = seatingType === "pair" 
     ? rows * teamsPerLine
     : 0
-
-  const studentsPerLine = seatingType === "pair"
-    ? teamsPerLine
-    : Math.ceil(studentCount / rows)
 
   const handleAddNumber = (seatIndex: number, numberStr: string, position?: number) => {
     const num = Number.parseInt(numberStr)
@@ -976,7 +999,11 @@ function StepThree({
     if (formData.seatingType === "pair") {
       return generatePairSeats(students, fixedMap, formData.lines, formData.pairOrder || "male-left", initialFixedSeats, formData.lines, formData.randomizeNumbers === true)
     } else {
-      return generateSingleSeats(students, fixedMap, formData.lines, initialFixedSeats, formData.lines, formData.randomizeNumbers === true)
+      // 1명씩 앉기: formData.lines는 1행에 배치할 학생 수
+      // 필요한 행 수 계산
+      const studentsPerLine = formData.lines || 1
+      const rows = Math.ceil(formData.studentCount / studentsPerLine)
+      return generateSingleSeats(students, fixedMap, studentsPerLine, initialFixedSeats, rows, formData.randomizeNumbers === true)
     }
   })
 
@@ -988,7 +1015,11 @@ function StepThree({
     if (formData.seatingType === "pair") {
       setSeats(generatePairSeats(students, fixedMap, formData.lines, formData.pairOrder || "male-left", initialFixedSeats, formData.lines, formData.randomizeNumbers === true))
     } else {
-      setSeats(generateSingleSeats(students, fixedMap, formData.lines, initialFixedSeats, formData.lines, formData.randomizeNumbers === true))
+      // 1명씩 앉기: formData.lines는 1행에 배치할 학생 수
+      // 필요한 행 수 계산
+      const studentsPerLine = formData.lines || 1
+      const rows = Math.ceil(formData.studentCount / studentsPerLine)
+      setSeats(generateSingleSeats(students, fixedMap, studentsPerLine, initialFixedSeats, rows, formData.randomizeNumbers === true))
     }
   }
 
@@ -1006,7 +1037,11 @@ function StepThree({
     if (formData.seatingType === "pair") {
       setSeats(generatePairSeats(students, fixedMap, formData.lines, formData.pairOrder || "male-left", initialFixedSeats, formData.lines, formData.randomizeNumbers === true))
     } else {
-      setSeats(generateSingleSeats(students, fixedMap, formData.lines, initialFixedSeats, formData.lines, formData.randomizeNumbers === true))
+      // 1명씩 앉기: formData.lines는 1행에 배치할 학생 수
+      // 필요한 행 수 계산
+      const studentsPerLine = formData.lines || 1
+      const rows = Math.ceil(formData.studentCount / studentsPerLine)
+      setSeats(generateSingleSeats(students, fixedMap, studentsPerLine, initialFixedSeats, rows, formData.randomizeNumbers === true))
     }
   }
 
@@ -1039,7 +1074,11 @@ function StepThree({
     if (formData.seatingType === "pair") {
       setSeats(generatePairSeats(students, fixedMap, formData.lines, formData.pairOrder || "male-left", initialFixedSeats, formData.lines, formData.randomizeNumbers === true))
     } else {
-      setSeats(generateSingleSeats(students, fixedMap, formData.lines, initialFixedSeats, formData.lines, formData.randomizeNumbers === true))
+      // 1명씩 앉기: formData.lines는 1행에 배치할 학생 수
+      // 필요한 행 수 계산
+      const studentsPerLine = formData.lines || 1
+      const rows = Math.ceil(formData.studentCount / studentsPerLine)
+      setSeats(generateSingleSeats(students, fixedMap, studentsPerLine, initialFixedSeats, rows, formData.randomizeNumbers === true))
     }
   }
 
@@ -1051,9 +1090,11 @@ function StepThree({
           처음부터
         </Button>
       </div>
+      {formData.useFixedSeats && (
       <p className="text-sm text-gray-600 mb-6">
         학생을 클릭하면 고정할 수 있습니다. 고정된 학생은 다시 배치할 때도 같은 자리에 앉습니다.
       </p>
+      )}
 
       {fixedStudents.size > 0 && (
         <FixedStudentsPanel
@@ -1077,7 +1118,9 @@ function StepThree({
           onPrint={handlePrint}
           columns={formData.columns}
           boardPosition={formData.boardPosition}
-          rows={formData.lines}
+          rows={formData.seatingType === "single" 
+            ? Math.ceil(formData.studentCount / (formData.lines || 1))
+            : formData.lines}
           teamsPerLine={formData.lines}
             totalSeats={formData.studentCount}
         />

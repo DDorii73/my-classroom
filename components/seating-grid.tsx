@@ -130,8 +130,15 @@ export function SeatingGrid({
     )
   }
 
-  const totalStudents = (seats as Student[]).length
-  const studentsPerLine = teamsPerLine || Math.ceil(totalStudents / rows)
+  // 1명씩 앉기일 때는 teamsPerLine (1행에 배치할 학생 수)를 그대로 사용
+  const studentsPerLine = seatingType === "single" 
+    ? teamsPerLine || Math.ceil(totalSeats / rows)
+    : teamsPerLine || Math.ceil((seats as Student[]).length / rows)
+  
+  // 1명씩 앉기일 때는 totalSeats를 사용하여 모든 자리 표시 (빈 자리 포함)
+  const totalStudents = seatingType === "single" 
+    ? totalSeats 
+    : (seats as Student[]).length
 
   return (
     <div className="space-y-4">
@@ -141,7 +148,9 @@ export function SeatingGrid({
         {Array.from({ length: rows }).map((_, rowIndex) => {
           const startIdx = rowIndex * studentsPerLine
           const endIdx = Math.min(startIdx + studentsPerLine, totalStudents)
-          const studentsInRow = (seats as Student[]).slice(startIdx, endIdx)
+          const studentsInRow = seatingType === "single"
+            ? (seats as (Student | null)[]).slice(startIdx, endIdx)
+            : (seats as Student[]).slice(startIdx, endIdx)
 
           return (
             <div key={rowIndex} className="border-l-4 border-blue-400 pl-3">
@@ -171,7 +180,12 @@ export function SeatingGrid({
                           <div className="font-bold text-lg text-gray-800">{student.id}번</div>
                           <div className="text-sm text-gray-600 font-semibold">{getGenderLabel(student.gender)}</div>
                         </button>
-                      ) : null}
+                      ) : (
+                        // 빈 자리 표시 (학생 수가 부족한 경우)
+                        <div className="w-full p-3 rounded text-center bg-gray-100 border border-gray-300">
+                          <div className="text-gray-400 text-sm">빈 자리</div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
